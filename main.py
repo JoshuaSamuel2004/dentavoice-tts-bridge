@@ -7,10 +7,10 @@ import struct
 app = FastAPI()
 
 # Your Sarvam API key (set this as environment variable on Render)
-SARVAM_API_KEY = os.environ.get("SARVAM_API_KEY", "sk_hk4s4kw1_H1sWoJZNlHpN5ERB1xavYDHn")
+SARVAM_API_KEY = os.environ.get("SARVAM_API_KEY", "your-key-here")
 
 # Change this to the voice you picked in Step B
-SARVAM_SPEAKER = os.environ.get("SARVAM_SPEAKER", "riya")
+SARVAM_SPEAKER = os.environ.get("SARVAM_SPEAKER", "priya")
 
 # Sarvam API URL
 SARVAM_TTS_URL = "https://api.sarvam.ai/text-to-speech"
