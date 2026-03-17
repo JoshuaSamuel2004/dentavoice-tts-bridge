@@ -15,6 +15,7 @@ async def custom_tts(request: Request):
     try:
         body = await request.json()
         print(f"Received from Vapi: {list(body.keys())}")
+        print(f"Full body: {body}")
  
         # Extract text from Vapi's request
         text = ""
@@ -36,21 +37,18 @@ async def custom_tts(request: Request):
         print(f"Text to speak: '{text[:100]}'" if text else "No text found!")
  
         if not text:
-            print(f"WARNING: No text in payload. Body: {body}")
+            print(f"WARNING: No text in payload.")
             return Response(content=b"", status_code=200)
  
-        speaker = SARVAM_SPEAKER
-        print(f"Using speaker: {speaker}")
- 
-        # Call Sarvam TTS API
-        # Try WAV format which includes proper headers
+        # Sarvam TTS - using mulaw at 8kHz (telephony standard)
+        # This is what voice pipelines like Vapi typically expect
         payload = {
             "inputs": [text],
             "target_language_code": "hi-IN",
-            "speaker": speaker,
+            "speaker": SARVAM_SPEAKER,
             "model": "bulbul:v3",
-            "audio_format": "wav",
-            "audio_sample_rate": 16000,
+            "audio_format": "mulaw",
+            "audio_sample_rate": 8000,
             "enable_preprocessing": True,
             "pace": 1.2,
         }
@@ -60,7 +58,7 @@ async def custom_tts(request: Request):
             "api-subscription-key": SARVAM_API_KEY,
         }
  
-        print(f"Calling Sarvam with speaker={speaker}, pace=1.2, format=wav...")
+        print(f"Calling Sarvam: speaker={SARVAM_SPEAKER}, format=mulaw, rate=8000, pace=1.2")
  
         async with httpx.AsyncClient(timeout=15.0) as client:
             response = await client.post(
@@ -83,13 +81,13 @@ async def custom_tts(request: Request):
             return Response(content=b"", status_code=200)
  
         audio_bytes = base64.b64decode(audio_b64)
-        print(f"Got {len(audio_bytes)} bytes of audio")
+        print(f"Got {len(audio_bytes)} bytes of mulaw audio")
  
-        # Return WAV audio directly from Sarvam
-        # Sarvam's WAV format already has the correct headers
+        # Return raw mulaw audio - no headers, no wrapper
+        # Content-Type audio/basic is the standard for mulaw
         return Response(
             content=audio_bytes,
-            media_type="audio/wav",
+            media_type="audio/basic",
         )
  
     except Exception as e:
@@ -113,13 +111,10 @@ async def root():
     }
  
  
-# Test endpoint - try different voices without redeploying
-# Visit: https://your-url.onrender.com/test?voice=neha
-# or: https://your-url.onrender.com/test?voice=kavya
 @app.get("/test")
-async def test_voice(voice: str = "priya"):
+async def test_voice(voice: str = "ritu"):
     test_text = "SmileCare Dental mein aapka swagat hai! Main Priya bol rahi hoon."
-    
+ 
     payload = {
         "inputs": [test_text],
         "target_language_code": "hi-IN",
