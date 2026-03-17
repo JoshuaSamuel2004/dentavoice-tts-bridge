@@ -6,7 +6,7 @@ import os
 app = FastAPI()
  
 SARVAM_API_KEY = os.environ.get("SARVAM_API_KEY", "your-key-here")
-SARVAM_SPEAKER = os.environ.get("SARVAM_SPEAKER", "priya")
+SARVAM_SPEAKER = os.environ.get("SARVAM_SPEAKER", "ritu")
 SARVAM_TTS_URL = "https://api.sarvam.ai/text-to-speech"
  
  
