@@ -1,3 +1,6 @@
+
+Copy
+
 from fastapi import FastAPI, Request, Response
 import httpx
 import base64
@@ -37,19 +40,22 @@ async def custom_tts(request: Request):
  
         if not text:
             print(f"WARNING: No text in payload. Body: {body}")
-            return Response(content=b'\x00' * 320, media_type="audio/pcm")
+            return Response(content=b"", status_code=200)
+ 
+        speaker = SARVAM_SPEAKER
+        print(f"Using speaker: {speaker}")
  
         # Call Sarvam TTS API
-        # Using linear16 (raw PCM) at 16kHz - exactly what Vapi needs
+        # Try WAV format which includes proper headers
         payload = {
             "inputs": [text],
             "target_language_code": "hi-IN",
-            "speaker": SARVAM_SPEAKER,
+            "speaker": speaker,
             "model": "bulbul:v3",
-            "audio_format": "linear16",
+            "audio_format": "wav",
             "audio_sample_rate": 16000,
             "enable_preprocessing": True,
-            "pace": 1.25,
+            "pace": 1.2,
         }
  
         headers = {
@@ -57,7 +63,7 @@ async def custom_tts(request: Request):
             "api-subscription-key": SARVAM_API_KEY,
         }
  
-        print(f"Calling Sarvam with speaker={SARVAM_SPEAKER}, pace=1.25...")
+        print(f"Calling Sarvam with speaker={speaker}, pace=1.2, format=wav...")
  
         async with httpx.AsyncClient(timeout=15.0) as client:
             response = await client.post(
@@ -70,43 +76,35 @@ async def custom_tts(request: Request):
  
         if response.status_code != 200:
             print(f"Sarvam error: {response.status_code} - {response.text[:500]}")
-            return Response(content=b'\x00' * 320, media_type="audio/pcm")
+            return Response(content=b"", status_code=200)
  
         result = response.json()
         audio_b64 = result.get("audios", [None])[0]
  
         if not audio_b64:
             print("No audio in Sarvam response!")
-            return Response(content=b'\x00' * 320, media_type="audio/pcm")
+            return Response(content=b"", status_code=200)
  
-        # Decode the base64 audio - this is raw PCM 16-bit 16kHz mono
         audio_bytes = base64.b64decode(audio_b64)
         print(f"Got {len(audio_bytes)} bytes of audio")
  
-        # Return RAW PCM audio to Vapi - NO WAV header
-        # The WAV header was causing the "thud" sound
-        # Vapi expects raw PCM: 16-bit, 16kHz, mono
+        # Return WAV audio directly from Sarvam
+        # Sarvam's WAV format already has the correct headers
         return Response(
             content=audio_bytes,
-            media_type="audio/pcm",
-            headers={
-                "Content-Type": "audio/pcm",
-                "X-Audio-Sample-Rate": "16000",
-                "X-Audio-Channels": "1",
-                "X-Audio-Bit-Depth": "16",
-            }
+            media_type="audio/wav",
         )
  
     except Exception as e:
         print(f"Error in /tts: {e}")
         import traceback
         traceback.print_exc()
-        return Response(content=b'\x00' * 320, media_type="audio/pcm")
+        return Response(content=b"", status_code=200)
  
  
 @app.get("/health")
 async def health():
-    return {"status": "ok", "service": "dentavoice-tts-bridge"}
+    return {"status": "ok", "service": "dentavoice-tts-bridge", "speaker": SARVAM_SPEAKER}
  
  
 @app.get("/")
@@ -115,8 +113,49 @@ async def root():
         "service": "DentaVoice TTS Bridge",
         "status": "running",
         "speaker": SARVAM_SPEAKER,
-        "endpoints": {"/tts": "POST - Vapi custom TTS", "/health": "GET - Health check"}
     }
+ 
+ 
+# Test endpoint - try different voices without redeploying
+# Visit: https://your-url.onrender.com/test?voice=neha
+# or: https://your-url.onrender.com/test?voice=kavya
+@app.get("/test")
+async def test_voice(voice: str = "priya"):
+    test_text = "SmileCare Dental mein aapka swagat hai! Main Priya bol rahi hoon."
+    
+    payload = {
+        "inputs": [test_text],
+        "target_language_code": "hi-IN",
+        "speaker": voice,
+        "model": "bulbul:v3",
+        "audio_format": "wav",
+        "audio_sample_rate": 24000,
+        "enable_preprocessing": True,
+        "pace": 1.2,
+    }
+ 
+    headers = {
+        "Content-Type": "application/json",
+        "api-subscription-key": SARVAM_API_KEY,
+    }
+ 
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            response = await client.post(SARVAM_TTS_URL, json=payload, headers=headers)
+ 
+        if response.status_code != 200:
+            return {"error": f"Sarvam returned {response.status_code}", "detail": response.text[:300]}
+ 
+        result = response.json()
+        audio_b64 = result.get("audios", [None])[0]
+        if not audio_b64:
+            return {"error": "No audio returned"}
+ 
+        audio_bytes = base64.b64decode(audio_b64)
+        return Response(content=audio_bytes, media_type="audio/wav")
+ 
+    except Exception as e:
+        return {"error": str(e)}
  
  
 if __name__ == "__main__":
