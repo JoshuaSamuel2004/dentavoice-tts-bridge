@@ -10,7 +10,7 @@ app = FastAPI()
 SARVAM_API_KEY = os.environ.get("SARVAM_API_KEY", "sk_hk4s4kw1_H1sWoJZNlHpN5ERB1xavYDHn")
  
 # Your chosen Sarvam voice
-SARVAM_SPEAKER = os.environ.get("SARVAM_SPEAKER", "ritu")
+SARVAM_SPEAKER = os.environ.get("SARVAM_SPEAKER", "priya")
  
 # Sarvam API URL
 SARVAM_TTS_URL = "https://api.sarvam.ai/text-to-speech"
